@@ -1,0 +1,21 @@
+server:
+  port: ${APP_PORT:8080}
+
+spring:
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+    serialization:
+      write-dates-as-timestamps: false
+
+app:
+  data-dir: ${APP_DATA_DIR:data}
+  treasury:
+    base-url: ${TREASURY_BASE_URL:https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/rates_of_exchange_source}
+    request-timeout: ${TREASURY_REQUEST_TIMEOUT:20s}
+    refresh-interval: ${TREASURY_REFRESH_INTERVAL:12h}
