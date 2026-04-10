@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @RestController
 public class PurchaseController {
@@ -53,9 +54,7 @@ public class PurchaseController {
             @PathVariable String purchaseId,
             @RequestParam String currency
     ) {
-        if (purchaseId == null || purchaseId.trim().isEmpty()) {
-            throw AppException.badRequest("purchase id is required");
-        }
+        String normalizedPurchaseId = normalizePurchaseId(purchaseId);
 
         String normalizedCurrency = currency == null ? "" : currency.trim().toUpperCase();
         if (normalizedCurrency.isEmpty()) {
@@ -65,7 +64,7 @@ public class PurchaseController {
             throw AppException.badRequest("currency must be a valid ISO 4217 alpha code");
         }
 
-        var convertedPurchase = purchaseService.getConvertedPurchase(purchaseId, normalizedCurrency);
+        var convertedPurchase = purchaseService.getConvertedPurchase(normalizedPurchaseId, normalizedCurrency);
 
         return new ConvertedPurchaseResponse(
                 convertedPurchase.purchase().id(),
@@ -95,5 +94,22 @@ public class PurchaseController {
             throw AppException.badRequest("transactionDate must be a valid date in YYYY-MM-DD format");
         }
     }
-}
 
+    private String normalizePurchaseId(String rawPurchaseId) {
+        if (rawPurchaseId == null || rawPurchaseId.trim().isEmpty()) {
+            throw AppException.badRequest("purchase id is required");
+        }
+
+        String purchaseId = rawPurchaseId.trim();
+
+        try {
+            UUID uuid = UUID.fromString(purchaseId);
+            if (uuid.version() != 4) {
+                throw AppException.badRequest("purchase id must be a valid UUID v4");
+            }
+            return purchaseId;
+        } catch (IllegalArgumentException exception) {
+            throw AppException.badRequest("purchase id must be a valid UUID v4");
+        }
+    }
+}

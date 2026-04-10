@@ -70,9 +70,22 @@ class PurchaseControllerTest {
         FileRateRepository rateRepository = new FileRateRepository(newProperties(), objectMapper);
         MockMvc mockMvc = buildMockMvc(objectMapper, rateRepository);
 
-        mockMvc.perform(get("/api/v1/purchases/{purchaseId}", "purchase-123").queryParam("currency", "EURO"))
+        mockMvc.perform(get("/api/v1/purchases/{purchaseId}", "550e8400-e29b-41d4-a716-446655440000").queryParam("currency", "EURO"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("bad_request"));
+    }
+
+    @Test
+    void getPurchaseRejectsInvalidUuidWithJsonError() throws Exception {
+        ObjectMapper objectMapper = newObjectMapper();
+        FileRateRepository rateRepository = new FileRateRepository(newProperties(), objectMapper);
+        MockMvc mockMvc = buildMockMvc(objectMapper, rateRepository);
+
+        mockMvc.perform(get("/api/v1/purchases/{purchaseId}", "<id>").queryParam("currency", "EUR"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("bad_request"))
+                .andExpect(jsonPath("$.error.message").value("purchase id must be a valid UUID v4"))
+                .andExpect(jsonPath("$.error.status").value(400));
     }
 
     @Test
@@ -109,7 +122,7 @@ class PurchaseControllerTest {
         FileRateRepository rateRepository = new FileRateRepository(newProperties(), objectMapper);
         MockMvc mockMvc = buildMockMvc(objectMapper, rateRepository);
 
-        mockMvc.perform(get("/api/v1/purchases/{purchaseId}", "purchase-123"))
+        mockMvc.perform(get("/api/v1/purchases/{purchaseId}", "550e8400-e29b-41d4-a716-446655440000"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("bad_request"))
                 .andExpect(jsonPath("$.error.status").value(400));
@@ -121,7 +134,7 @@ class PurchaseControllerTest {
         FileRateRepository rateRepository = new FileRateRepository(newProperties(), objectMapper);
         MockMvc mockMvc = buildMockMvc(objectMapper, rateRepository);
 
-        mockMvc.perform(put("/api/v1/purchases/{purchaseId}", "purchase-123"))
+        mockMvc.perform(put("/api/v1/purchases/{purchaseId}", "550e8400-e29b-41d4-a716-446655440000"))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.error.code").value("method_not_allowed"))
                 .andExpect(jsonPath("$.error.status").value(405));
