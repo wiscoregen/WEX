@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wex.assessment.config.AppProperties;
 import com.wex.assessment.domain.ExchangeRate;
 import com.wex.assessment.error.AppException;
+
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -15,6 +16,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 @Component
 public class HttpTreasuryClient implements TreasuryClient {
@@ -103,7 +106,7 @@ public class HttpTreasuryClient implements TreasuryClient {
             return objectMapper.readValue(response, FiscalResponse.class);
         } catch (AppException ex) {
             throw ex;
-        } catch (Exception ex) {
+        } catch (JsonProcessingException ex) {
             throw AppException.internal("decode treasury response", ex);
         }
     }

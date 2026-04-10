@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.wex.assessment.config.AppProperties;
 import com.wex.assessment.domain.ExchangeRate;
+import com.wex.assessment.domain.RateCacheStats;
 import com.wex.assessment.error.AppException;
 import com.wex.assessment.error.ErrorCode;
 import com.wex.assessment.repository.FileRateRepository;
@@ -22,6 +23,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RateServiceTest {
+
+    @Test
+    void lookupRateReturnsUsdAtParityForPurchaseDate() {
+        RateService service = new RateService(newRepository(), emptyClient(), fixedClock());
+
+        ExchangeRate rate = service.lookupRate(" usd ", LocalDate.parse("2025-05-15"));
+
+        assertThat(rate.currencyCode()).isEqualTo("USD");
+        assertThat(rate.exchangeRate()).isEqualTo("1");
+        assertThat(rate.effectiveDate()).isEqualTo(LocalDate.parse("2025-05-15"));
+    }
 
     @Test
     void lookupRateUsesMostRecentRateOnOrBeforePurchaseDate() {
@@ -56,6 +68,21 @@ class RateServiceTest {
     }
 
     @Test
+    void lookupRateAllowsRateExactlyAtSixMonthBoundary() {
+        FileRateRepository repository = newRepository();
+        repository.replaceAll(List.of(
+                new ExchangeRate("EUR", "Belgium", "Euro", "Belgium-Euro", "0.82", LocalDate.parse("2024-08-01"))
+        ), Instant.now());
+
+        RateService service = new RateService(repository, emptyClient(), fixedClock());
+
+        ExchangeRate rate = service.lookupRate("EUR", LocalDate.parse("2025-02-01"));
+
+        assertThat(rate.exchangeRate()).isEqualTo("0.82");
+        assertThat(rate.effectiveDate()).isEqualTo(LocalDate.parse("2024-08-01"));
+    }
+
+    @Test
     void lookupRateReturnsUnsupportedCurrencyForValidIsoCodeNotBackedByTreasuryMapping() {
         FileRateRepository repository = newRepository();
         RateService service = new RateService(repository, emptyClient(), fixedClock());
@@ -63,6 +90,25 @@ class RateServiceTest {
         assertThatThrownBy(() -> service.lookupRate("AOA", LocalDate.parse("2025-02-01")))
                 .isInstanceOf(AppException.class)
                 .satisfies(throwable -> assertThat(((AppException) throwable).getCode()).isEqualTo(ErrorCode.UNSUPPORTED_CURRENCY));
+    }
+
+    @Test
+    void refreshCacheStoresFetchedRatesAndUpdatesStats() {
+        FileRateRepository repository = newRepository();
+        Clock clock = Clock.fixed(Instant.parse("2025-04-01T00:00:00Z"), ZoneOffset.UTC);
+        TreasuryClient treasuryClient = () -> List.of(
+                new ExchangeRate("EUR", "Belgium", "Euro", "Belgium-Euro", "0.90", LocalDate.parse("2025-03-31")),
+                new ExchangeRate("JPY", "Japan", "Yen", "Japan-Yen", "149.85", LocalDate.parse("2025-03-31"))
+        );
+
+        RateService service = new RateService(repository, treasuryClient, clock);
+
+        RateCacheStats stats = service.refreshCache();
+
+        assertThat(stats.currencyCount()).isEqualTo(2);
+        assertThat(stats.rateCount()).isEqualTo(2);
+        assertThat(stats.lastRefreshedUtc()).isEqualTo(clock.instant());
+        assertThat(service.lookupRate("EUR", LocalDate.parse("2025-04-10")).exchangeRate()).isEqualTo("0.90");
     }
 
     private FileRateRepository newRepository() {

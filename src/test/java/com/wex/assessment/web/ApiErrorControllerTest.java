@@ -22,12 +22,10 @@ class ApiErrorControllerTest {
 
     @Test
     void errorControllerReturnsJsonEnvelopeForRouteNotFound() throws Exception {
-        ErrorAttributes errorAttributes = new StubErrorAttributes(Map.of(
+        MockMvc mockMvc = newMockMvc(Map.of(
                 "status", 404,
                 "path", "/api/v1/unknown"
         ));
-
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new ApiErrorController(errorAttributes)).build();
 
         mockMvc.perform(get("/error")
                         .with(errorAttributes(404, "/api/v1/unknown"))
@@ -37,6 +35,64 @@ class ApiErrorControllerTest {
                 .andExpect(jsonPath("$.error.code").value("route_not_found"))
                 .andExpect(jsonPath("$.error.status").value(404))
                 .andExpect(jsonPath("$.error.message").value("no route found for GET /api/v1/unknown"));
+    }
+
+    @Test
+    void errorControllerReturnsJsonEnvelopeForMethodNotAllowed() throws Exception {
+        MockMvc mockMvc = newMockMvc(Map.of(
+                "status", 405,
+                "path", "/api/v1/purchases"
+        ));
+
+        mockMvc.perform(get("/error").with(errorAttributes(405, "/api/v1/purchases")))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.error.code").value("method_not_allowed"))
+                .andExpect(jsonPath("$.error.message").value("method GET is not allowed for /api/v1/purchases"));
+    }
+
+    @Test
+    void errorControllerReturnsJsonEnvelopeForUnsupportedMediaType() throws Exception {
+        MockMvc mockMvc = newMockMvc(Map.of(
+                "status", 415,
+                "path", "/api/v1/purchases"
+        ));
+
+        mockMvc.perform(get("/error").with(errorAttributes(415, "/api/v1/purchases")))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.error.code").value("unsupported_media_type"))
+                .andExpect(jsonPath("$.error.message").value("Content-Type must be application/json"));
+    }
+
+    @Test
+    void errorControllerReturnsJsonEnvelopeForBadRequestUsingProvidedMessage() throws Exception {
+        MockMvc mockMvc = newMockMvc(Map.of(
+                "status", 400,
+                "path", "/api/v1/purchases",
+                "message", "currency query parameter is required"
+        ));
+
+        mockMvc.perform(get("/error").with(errorAttributes(400, "/api/v1/purchases")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("bad_request"))
+                .andExpect(jsonPath("$.error.message").value("currency query parameter is required"));
+    }
+
+    @Test
+    void errorControllerDefaultsUnexpectedStatusesToInternalError() throws Exception {
+        MockMvc mockMvc = newMockMvc(Map.of(
+                "status", 500,
+                "path", "/api/v1/purchases"
+        ));
+
+        mockMvc.perform(get("/error").with(errorAttributes(500, "/api/v1/purchases")))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error.code").value("internal_error"))
+                .andExpect(jsonPath("$.error.message").value("unexpected server error"));
+    }
+
+    private MockMvc newMockMvc(Map<String, Object> attributes) {
+        ErrorAttributes errorAttributes = new StubErrorAttributes(attributes);
+        return MockMvcBuilders.standaloneSetup(new ApiErrorController(errorAttributes)).build();
     }
 
     private RequestPostProcessor errorAttributes(int statusCode, String path) {

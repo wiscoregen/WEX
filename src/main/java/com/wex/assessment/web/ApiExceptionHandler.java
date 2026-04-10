@@ -1,10 +1,13 @@
 package com.wex.assessment.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wex.assessment.error.AppException;
 import com.wex.assessment.error.ErrorCode;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
@@ -18,10 +21,17 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.io.IOException;
+
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
+    private final ObjectMapper objectMapper;
+
+    public ApiExceptionHandler(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiErrorEnvelope> handleAppException(AppException exception) {
@@ -56,8 +66,8 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
-    public ResponseEntity<ApiErrorEnvelope> handleNotAcceptable(HttpMediaTypeNotAcceptableException exception) {
-        return build(AppException.notAcceptable("requested response media type is not supported"));
+    public void handleNotAcceptable(HttpMediaTypeNotAcceptableException exception, HttpServletResponse response) throws IOException {
+        write(response, AppException.notAcceptable("requested response media type is not supported"));
     }
 
     @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
@@ -92,5 +102,15 @@ public class ApiExceptionHandler {
     private ResponseEntity<ApiErrorEnvelope> build(AppException exception) {
         return ResponseEntity.status(exception.getStatus())
                 .body(ApiErrorEnvelope.from(exception.getCode(), exception.getMessage(), exception.getStatus().value()));
+    }
+
+    private void write(HttpServletResponse response, AppException exception) throws IOException {
+        response.setStatus(exception.getStatus().value());
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(
+                response.getWriter(),
+                ApiErrorEnvelope.from(exception.getCode(), exception.getMessage(), exception.getStatus().value())
+        );
     }
 }

@@ -39,9 +39,7 @@ public class JavaHttpTreasuryTransport implements TreasuryTransport {
                         new IllegalStateException("treasury API returned status " + response.statusCode()));
             }
             return response.body();
-        } catch (IllegalArgumentException ex) {
-            throw AppException.internal("call treasury API", ex);
-        } catch (IOException ex) {
+        } catch (IllegalArgumentException | IOException ex) {
             throw AppException.internal("call treasury API", ex);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
